@@ -93,7 +93,7 @@ async fn main() -> TantivyResult<()> {
     println!("Spidermonkey startup");
 
     let search_app = Arc::new(
-        search_engine::CodeSearchEngine::new(directory.as_str(), mb * 1024 * 1024).unwrap(),
+        CodeSearchEngine::new(directory.as_str(), mb * 1024 * 1024).unwrap(),
     );
 
     // Build CORS middleware

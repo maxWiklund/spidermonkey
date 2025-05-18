@@ -66,17 +66,26 @@
         if (e.key === 'Enter') performSearch();
     });
 
-    function performSearch() {
-        const query = document.getElementById('searchInput').value.trim();
-        if (!query) return;
+    function escapeForRegex(str) {
+        return str.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    }
 
-        fetch(`${API_URL}?text=${encodeURIComponent(query)}`)
+
+    function performSearch() {
+        const input = document.getElementById('searchInput').value.trim();
+        if (!input) return;
+
+        // URL encode AFTER escaping special characters
+        var search = encodeURIComponent(input);
+        search = escapeForRegex(search);
+        console.log('Escaped Query:', search); // Debug: shows escaped regex-ready string
+
+        fetch(`${API_URL}?text=${search}`)
             .then(res => res.json())
             .then(data => {
                 allResults = data.results || [];
                 currentPage = 1;
 
-                // Show search duration if available
                 const searchTimeElement = document.getElementById('searchTime');
                 if (data.time) {
                     const duration = parseFloat(data.time).toFixed(2);
@@ -151,63 +160,6 @@
         hljs.highlightAll();
     }
 
-    function renderPagination() {
-        const totalPages = Math.ceil(allResults.length / RESULTS_PER_PAGE);
-        const pagination = document.getElementById('pagination');
-        pagination.innerHTML = '';
-
-        // Calculate the page range to display
-        const startPage = Math.floor((currentPage - 1) / PAGES_DISPLAY) * PAGES_DISPLAY + 1;
-        const endPage = Math.min(startPage + PAGES_DISPLAY - 1, totalPages);
-
-        // Previous Button
-        const prevBtn = document.createElement('li');
-        prevBtn.className = `page-item ${currentPage === 1 ? 'disabled' : ''}`;
-        const prevButton = document.createElement('button');
-        prevButton.className = 'page-link';
-        prevButton.textContent = 'Previous';
-        prevButton.addEventListener('click', () => {
-            if (currentPage > 1) {
-                currentPage--;
-                renderResults();
-                renderPagination();
-            }
-        });
-        prevBtn.appendChild(prevButton);
-        pagination.appendChild(prevBtn);
-
-        // Page Number Buttons
-        for (let i = startPage; i <= endPage; i++) {
-            const li = document.createElement('li');
-            li.className = `page-item ${i === currentPage ? 'active' : ''}`;
-            const btn = document.createElement('button');
-            btn.className = 'page-link';
-            btn.textContent = i;
-            btn.addEventListener('click', () => {
-                currentPage = i;
-                renderResults();
-                renderPagination();
-            });
-            li.appendChild(btn);
-            pagination.appendChild(li);
-        }
-
-        // Next Button
-        const nextBtn = document.createElement('li');
-        nextBtn.className = `page-item ${currentPage === totalPages ? 'disabled' : ''}`;
-        const nextButton = document.createElement('button');
-        nextButton.className = 'page-link';
-        nextButton.textContent = 'Next';
-        nextButton.addEventListener('click', () => {
-            if (currentPage < totalPages) {
-                currentPage++;
-                renderResults();
-                renderPagination();
-            }
-        });
-        nextBtn.appendChild(nextButton);
-        pagination.appendChild(nextBtn);
-    }
 
     function escapeHtml(str) {
         return str

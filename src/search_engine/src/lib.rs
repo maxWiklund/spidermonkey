@@ -137,8 +137,8 @@ impl CodeSearchEngine {
                         line: line_num as usize,
                     });
                 }
-                _ => {
-                    println!("Failed to read lines from {}", file_path);
+                Err(e) => {
+                    println!("Error while reading {}: {}",file_path,  e);
                 }
             }
         }
@@ -155,7 +155,7 @@ impl CodeSearchEngine {
         let lines: Vec<&str> = text.split_inclusive('\n').collect();
         let total = lines.len();
 
-        if line >= total {
+        if line > total {
             return Err(io::Error::new(
                 io::ErrorKind::InvalidInput,
                 format!("line index {} out of range (0..{})", line, total),
