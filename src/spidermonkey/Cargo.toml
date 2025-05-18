@@ -1,0 +1,15 @@
+[package]
+name = "spidermonkey"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+tantivy = "0.24"
+search_engine = {workspace = true}
+
+serde      = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+tokio = { version = "1", features = ["full"] }
+axum = "0.8"
+tower-http = { version = "0.6.4", features = ["cors", "trace"] }
+clap = "4.5"

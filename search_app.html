@@ -1,0 +1,281 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Code Search UI</title>
+
+    <!-- Bootstrap CSS -->
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet" />
+
+    <!-- Highlight.js CSS -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.7.0/styles/default.min.css" />
+
+    <style>
+        body { background-color: #f8f9fa; }
+        .result-card { margin-bottom: 1rem; }
+        .code-block { background: #2d2d2d; color: #f8f8f2; border-radius: .25rem; }
+        pre { margin: 0; padding: 1rem; overflow-x: auto; }
+    </style>
+</head>
+<body>
+<div class="container py-5">
+    <h1 class="mb-4">Code Search</h1>
+    <div class="input-group mb-3">
+        <input type="text" id="searchInput" class="form-control" placeholder="Enter search term..." />
+        <button id="searchBtn" class="btn btn-primary">Search</button>
+    </div>
+    <div id="searchTime" class="mb-3 text-muted"></div>
+
+    <div id="resultsContainer"></div>
+
+    <nav>
+        <ul class="pagination justify-content-center" id="pagination"></ul>
+    </nav>
+</div>
+
+<!-- Bootstrap JS Bundle -->
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
+
+<!-- Highlight.js Core -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.7.0/highlight.min.js"></script>
+
+<!-- Highlight.js Languages -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.7.0/languages/java.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.7.0/languages/javascript.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.7.0/languages/xml.min.js"></script> <!-- HTML -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.7.0/languages/css.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.7.0/languages/python.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.7.0/languages/cpp.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.7.0/languages/bash.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.7.0/languages/c.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.7.0/languages/rust.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.7.0/languages/markdown.min.js"></script>
+
+<script>hljs.highlightAll();</script>
+
+<script>
+    const API_URL = 'http://127.0.0.1:3000/search';
+    const RESULTS_PER_PAGE = 10; // Change to 20 results per page
+    const PAGES_DISPLAY = 10; // Display 10 pages at a time
+    let allResults = [];
+    let currentPage = 1;
+
+    document.getElementById('searchBtn').addEventListener('click', performSearch);
+    document.getElementById('searchInput').addEventListener('keypress', (e) => {
+        if (e.key === 'Enter') performSearch();
+    });
+
+    function performSearch() {
+        const query = document.getElementById('searchInput').value.trim();
+        if (!query) return;
+
+        fetch(`${API_URL}?text=${encodeURIComponent(query)}`)
+            .then(res => res.json())
+            .then(data => {
+                allResults = data.results || [];
+                currentPage = 1;
+
+                // Show search duration if available
+                const searchTimeElement = document.getElementById('searchTime');
+                if (data.time) {
+                    const duration = parseFloat(data.time).toFixed(2);
+                    searchTimeElement.textContent = `Search completed in ${duration} seconds.`;
+                } else {
+                    searchTimeElement.textContent = '';
+                }
+
+                renderResults();
+                renderPagination();
+            })
+            .catch(err => {
+                console.error(err);
+                document.getElementById('resultsContainer').innerHTML =
+                    '<div class="alert alert-danger">Failed to fetch results.</div>';
+            });
+    }
+
+
+    function getLanguageFromPath(path) {
+        const ext = path.split('.').pop().toLowerCase();
+        const map = {
+            'java': 'java',
+            'js': 'javascript',
+            'html': 'xml',
+            'htm': 'xml',
+            'css': 'css',
+            'py': 'python',
+            'cpp': 'cpp',
+            'cxx': 'cpp',
+            'cc': 'cpp',
+            'c': 'c',
+            'sh': 'bash',
+            'bash': 'bash',
+            'rs': 'rust',
+            'md': 'markdown',
+            'markdown': 'markdown'
+        };
+        return map[ext] || 'plaintext';
+    }
+
+    function renderResults() {
+        const container = document.getElementById('resultsContainer');
+        container.innerHTML = '';
+
+        const start = (currentPage - 1) * RESULTS_PER_PAGE;
+        const end = start + RESULTS_PER_PAGE;
+        const pageResults = allResults.slice(start, end);
+
+        if (!pageResults.length) {
+            container.innerHTML = '<div class="alert alert-warning">No results found.</div>';
+            return;
+        }
+
+        pageResults.forEach(item => {
+            const langClass = getLanguageFromPath(item.path);
+            const card = document.createElement('div');
+            card.className = 'card result-card';
+
+            const body = `
+          <div class="card-body">
+            <h5 class="card-title">${item.path}</h5>
+            <h6 class="card-subtitle mb-2 text-muted">Line: ${item.line}</h6>
+            <pre><code class="code-block hljs language-${langClass}">${escapeHtml(item.body)}</code></pre>
+          </div>
+        `;
+
+            card.innerHTML = body;
+            container.appendChild(card);
+        });
+
+        hljs.highlightAll();
+    }
+
+    function renderPagination() {
+        const totalPages = Math.ceil(allResults.length / RESULTS_PER_PAGE);
+        const pagination = document.getElementById('pagination');
+        pagination.innerHTML = '';
+
+        // Calculate the page range to display
+        const startPage = Math.floor((currentPage - 1) / PAGES_DISPLAY) * PAGES_DISPLAY + 1;
+        const endPage = Math.min(startPage + PAGES_DISPLAY - 1, totalPages);
+
+        // Previous Button
+        const prevBtn = document.createElement('li');
+        prevBtn.className = `page-item ${currentPage === 1 ? 'disabled' : ''}`;
+        const prevButton = document.createElement('button');
+        prevButton.className = 'page-link';
+        prevButton.textContent = 'Previous';
+        prevButton.addEventListener('click', () => {
+            if (currentPage > 1) {
+                currentPage--;
+                renderResults();
+                renderPagination();
+            }
+        });
+        prevBtn.appendChild(prevButton);
+        pagination.appendChild(prevBtn);
+
+        // Page Number Buttons
+        for (let i = startPage; i <= endPage; i++) {
+            const li = document.createElement('li');
+            li.className = `page-item ${i === currentPage ? 'active' : ''}`;
+            const btn = document.createElement('button');
+            btn.className = 'page-link';
+            btn.textContent = i;
+            btn.addEventListener('click', () => {
+                currentPage = i;
+                renderResults();
+                renderPagination();
+            });
+            li.appendChild(btn);
+            pagination.appendChild(li);
+        }
+
+        // Next Button
+        const nextBtn = document.createElement('li');
+        nextBtn.className = `page-item ${currentPage === totalPages ? 'disabled' : ''}`;
+        const nextButton = document.createElement('button');
+        nextButton.className = 'page-link';
+        nextButton.textContent = 'Next';
+        nextButton.addEventListener('click', () => {
+            if (currentPage < totalPages) {
+                currentPage++;
+                renderResults();
+                renderPagination();
+            }
+        });
+        nextBtn.appendChild(nextButton);
+        pagination.appendChild(nextBtn);
+    }
+
+    function escapeHtml(str) {
+        return str
+            .replace(/&/g, '&amp;')
+            .replace(/</g, '&lt;')
+            .replace(/>/g, '&gt;');
+    }
+    function renderPagination() {
+        const totalPages = Math.ceil(allResults.length / RESULTS_PER_PAGE);
+        const pagination = document.getElementById('pagination');
+        pagination.innerHTML = '';
+
+        // Calculate the page range to display
+        const startPage = Math.floor((currentPage - 1) / PAGES_DISPLAY) * PAGES_DISPLAY + 1;
+        const endPage = Math.min(startPage + PAGES_DISPLAY - 1, totalPages);
+
+        // Previous Button
+        const prevBtn = document.createElement('li');
+        prevBtn.className = `page-item ${currentPage === 1 ? 'disabled' : ''}`;
+        const prevButton = document.createElement('button');
+        prevButton.className = 'page-link';
+        prevButton.textContent = 'Previous';
+        prevButton.addEventListener('click', () => {
+            if (currentPage > 1) {
+                currentPage--;
+                renderResults();
+                renderPagination();
+                window.scrollTo(0, 0);  // Scroll to top
+            }
+        });
+        prevBtn.appendChild(prevButton);
+        pagination.appendChild(prevBtn);
+
+        // Page Number Buttons
+        for (let i = startPage; i <= endPage; i++) {
+            const li = document.createElement('li');
+            li.className = `page-item ${i === currentPage ? 'active' : ''}`;
+            const btn = document.createElement('button');
+            btn.className = 'page-link';
+            btn.textContent = i;
+            btn.addEventListener('click', () => {
+                currentPage = i;
+                renderResults();
+                renderPagination();
+                window.scrollTo(0, 0);  // Scroll to top
+            });
+            li.appendChild(btn);
+            pagination.appendChild(li);
+        }
+
+        // Next Button
+        const nextBtn = document.createElement('li');
+        nextBtn.className = `page-item ${currentPage === totalPages ? 'disabled' : ''}`;
+        const nextButton = document.createElement('button');
+        nextButton.className = 'page-link';
+        nextButton.textContent = 'Next';
+        nextButton.addEventListener('click', () => {
+            if (currentPage < totalPages) {
+                currentPage++;
+                renderResults();
+                renderPagination();
+                window.scrollTo(0, 0);  // Scroll to top
+            }
+        });
+        nextBtn.appendChild(nextButton);
+        pagination.appendChild(nextBtn);
+    }
+
+</script>
+</body>
+</html>
