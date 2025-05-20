@@ -41,7 +41,7 @@ async fn search_handler(
     State(search_engine): State<Arc<CodeSearchEngine>>,
     Query(params): Query<SearchParams>,
 ) -> Json<Value> {
-    match search_engine.search(&params.text) {
+    match search_engine.search(&params.text).await {
         Ok(value) => match serde_json::to_value(value) {
             Ok(json_val) => Json(json_val),
             Err(_) => Json(json!({ "results": [] })),
@@ -92,9 +92,7 @@ async fn main() -> TantivyResult<()> {
 
     println!("Spidermonkey startup");
 
-    let search_app = Arc::new(
-        CodeSearchEngine::new(directory.as_str(), mb * 1024 * 1024).unwrap(),
-    );
+    let search_app = Arc::new(CodeSearchEngine::new(directory.as_str(), mb * 1024 * 1024).unwrap());
 
     // Build CORS middleware
     let cors = CorsLayer::new()
