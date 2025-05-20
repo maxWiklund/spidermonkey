@@ -31,10 +31,18 @@ use std::io;
 
 
 #[derive(Debug, Serialize)]
+pub struct LineRange {
+    start: usize,
+    end: usize,
+}
+
+
+#[derive(Debug, Serialize)]
 pub struct SearchResult {
     body: String,
     path: String,
     line: usize,
+    line_range: LineRange,
 }
 
 #[derive(Debug, Serialize)]
@@ -71,7 +79,7 @@ impl CodeSearchEngine {
             let path = entry.path();
             if path.is_file() {
                 if let Some(name) = path.to_str() {
-                    if name.contains(".git") {
+                    if name.contains(".git/") {
                         continue;
                     }
                 }
@@ -130,11 +138,15 @@ impl CodeSearchEngine {
                 .unwrap();
 
             match Self::read_lines(file_path, line_num as usize, 3) {
-                Ok(lines) => {
+                Ok((lines, (start, end))) => {
                     found_results.push(SearchResult {
                         body: lines,
                         path: file_path.to_string(),
                         line: line_num as usize,
+                        line_range: LineRange{
+                            start:start,
+                            end: end,
+                        }
                     });
                 }
                 Err(e) => {
@@ -150,8 +162,9 @@ impl CodeSearchEngine {
     }
 
     /// Helper method to read N lines around a target line from a file
-    fn read_lines(file_path: &str, line: usize, n: usize) -> io::Result<String> {
-        let text = fs::read_to_string(file_path)?;
+    fn read_lines(file_path: &str, line: usize, n: usize) -> io::Result<(String, (usize, usize))> {
+        let bytes = fs::read(file_path)?; // Read as raw bytes
+        let text = String::from_utf8_lossy(&bytes); // Replace invalid UTF-8 with �
         let lines: Vec<&str> = text.split_inclusive('\n').collect();
         let total = lines.len();
 
@@ -164,6 +177,6 @@ impl CodeSearchEngine {
 
         let start = line.saturating_sub(n);
         let end = (line + n).min(total - 1);
-        Ok(lines[start..=end].concat())
+        Ok((lines[start..=end].concat(), (start, end)))
     }
 }
